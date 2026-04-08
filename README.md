@@ -7,76 +7,176 @@ It uses [Tinkoff investments API](https://github.com/Tinkoff/investAPI)
 
 App name is `qwertyo1`
 
-## How to run
-To run the bot, you need to have a Tinkoff account.
-- Generate token for your account at [the settings](https://www.tinkoff.ru/invest/settings/)
-- Create a file `.env` with required env variables. You can find an example in `.env.example`
-- Create a file `instuments_config.json` with configurations. You can find an example in `instruments_config.json.example`
-- [Optional] Create virtual environment and activate it:
-  ```bash
-  pip install virtualenv
-  virtualenv --python=python3.9 venv
-  source venv/bin/activate
-  ```
-- Install dependencies with
-  ```bash
-  pip install -r requirements.txt
-  ```
-- Run the bot with 
-  ```bash 
-  make start
-  ```
+## 🚀 Quick Start
 
-## .env file content
-- `TOKEN`: Your Tinkoff token. You can generate it in [the settings](https://www.tinkoff.ru/invest/settings/)
-Can be a token for sandbox or for real account.
-- `ACCOUNT_ID`: Your Tinkoff account id. You can get it using [get accounts tool](#get-accounts-tool). If not specified, the first account  used.
-- `SANDBOX`: Set to `false` if you want to use real account. Default is `true`.
+### 1. Get Tinkoff Token
+1. Go to [Tinkoff Invest settings](https://www.tinkoff.ru/invest/settings/)
+2. Generate API token for your account
+3. Copy the token (starts with `t.`)
 
-## instruments_config.json file content
-#### instruments
-List of instruments you want to trade along with their settings.
-Each list element is a dictionary with the following keys:
-- `figi`: Tinkoff instrument id
-- `strategy`: The strategy configuration
-  - `name`: The name of the strategy to use
-  - `parameters`: Parameters of the strategy. More details can be found in the documentation of the strategy
+### 2. Clone and Setup
+```bash
+# Clone the repository
+git clone -b develop https://github.com/qwertyo1/tinkoff-trading-bot.git
+cd tinkoff-trading-bot
 
-#### Interval strategy parameters
-- `interval_size`: The percent of the prices to include into interval
-- `days_back_to_consider`: The number of days back to consider in interval calculation
-- `check_interval`: The interval in seconds to check for a new prices and for interval recalculation
-- `stop_loss_percent`: The percent from the price to trigger a stop loss
-- `quantity_limit`: The maximum quantity of the instrument to have in the portfolio
+# Run automated setup
+python3 setup.py
+```
 
-## Strategies
-### Interval strategy
-Main strategy logic is to buy at the lowest price and sell at the highest price of the
-calculated interval.
+Or manually:
+```bash
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-Interval is calculated by taking `interval_size` percents of the last prices
-for the last `days_back_to_consider` days. By default, it's set to 80 percents which means
-that the interval is from 10th to 90th percentile.
+# Install dependencies
+pip install -r requirements.txt
+```
 
-## Get accounts tool
-This is the tool to get your Tinkoff accounts. Useful when you don't know your account id.
-To run use this command:
+### 3. Configure
+```bash
+# Edit .env file with your token
+nano .env  # or any text editor
+```
+
+`.env` file content:
+```
+TOKEN=t.your_token_here
+ACCOUNT_ID=?
+SANDBOX=True
+```
+
+### 4. Get Account ID
 ```bash
 make get_accounts
 ```
 
-## Backtest
-In `test/strategies/interval/backtest/conftest.py` you can find the test configuration.
-Set up `figi`, `comission`, strategy config object, and `from_date` offset.
-To run backtest use this command:
+Copy the account ID and update `.env`:
+```
+TOKEN=t.your_token_here
+ACCOUNT_ID=your_account_id_here
+SANDBOX=True
+```
+
+### 5. Configure Trading Instruments
+Edit `instruments_config.json` to set which stocks to trade.
+
+Example for Sberbank:
+```json
+{
+  "instruments": [
+    {
+      "figi": "BBG004730N88",
+      "strategy": {
+        "name": "interval",
+        "parameters": {
+          "interval_size": 0.8,
+          "days_back_to_consider": 7,
+          "quantity_limit": 100,
+          "check_interval": 60,
+          "stop_loss_percent": 0.05
+        }
+      }
+    }
+  ]
+}
+```
+
+### 6. Run the Bot
+```bash
+make start
+```
+
+## 📋 Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `make setup` | Install dependencies and setup environment |
+| `make start` | Run the trading bot |
+| `make get_accounts` | Get your Tinkoff account ID |
+| `make backtest` | Run backtest on historical data |
+| `make display_stats` | Display trading statistics |
+| `make clean` | Remove virtual environment and cache |
+
+## 🔧 Configuration
+
+### .env file
+- `TOKEN`: Your Tinkoff API token from [settings](https://www.tinkoff.ru/invest/settings/)
+- `ACCOUNT_ID`: Your Tinkoff account ID (get with `make get_accounts`)
+- `SANDBOX`: Set to `False` for real trading, `True` for sandbox (default: True)
+
+### instruments_config.json
+List of instruments to trade with their settings.
+
+**Common FIGI codes:**
+- SBER (Сбербанк): `BBG004730N88`
+- GAZP (Газпром): `BBG004730RP0`
+- LKOH (Лукойл): `BBG004731032`
+- YNDX (Яндекс): `BBG006L8G4H1`
+- TCSG (Тинькофф): `BBG00Q3K5F77`
+
+**Interval strategy parameters:**
+- `interval_size`: Percent of prices to include in interval (0.8 = 80%)
+- `days_back_to_consider`: Days of history for interval calculation
+- `check_interval`: Seconds between price checks
+- `stop_loss_percent`: Stop loss trigger percent (0.05 = 5%)
+- `quantity_limit`: Maximum shares to hold
+
+## 📈 Strategies
+
+### Interval Strategy
+Main strategy logic: **buy low, sell high** within calculated price corridor.
+
+1. Calculates price corridor using percentiles (e.g., 10th to 90th percentile)
+2. **Buy** when price hits bottom of corridor
+3. **Sell** when price hits top of corridor
+4. **Stop-loss** sells all if price drops below purchase by stop_loss_percent
+
+## 🧪 Sandbox Mode
+
+The bot runs in **sandbox mode by default** - no real money is used.
+
+To switch to real trading:
+1. Set `SANDBOX=False` in `.env`
+2. Make sure you understand the risks!
+
+## 🧪 Backtest
+
+Test strategy on historical data:
+
 ```bash
 make backtest
 ```
-The result is saved in `test/strategies/interval/backtest/test_on_historical_data.txt`
 
-## Stats displaying
-Use this command to display stats:
+Configure test parameters in `tests/strategies/interval/backtest/conftest.py`.
+
+## 📊 Statistics
+
+View executed trades:
+
 ```bash
 make display_stats
 ```
-It will display the list of executed trades
+
+## 🐛 Troubleshooting
+
+### DNS Resolution Error (macOS)
+If you see `DNS resolution failed` error, the fix is already applied in Makefile.
+
+### ImportError: cannot import name 'MarketDataCache'
+This is fixed in the latest version. Run `git pull` to get updates.
+
+### ModuleNotFoundError
+Make sure virtual environment is activated:
+```bash
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## ⚠️ Disclaimer
+
+This bot is for educational purposes. Trading involves risk. Past performance does not guarantee future results.

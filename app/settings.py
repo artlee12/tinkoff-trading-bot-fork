@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     sandbox: bool = True
     log_level = logging.DEBUG
     tinkoff_library_log_level = logging.INFO
-    use_candle_history_cache = True
+    use_candle_history_cache = False
 
     class Config:
         env_file = ".env"
