@@ -109,14 +109,16 @@ def setup():
     # First install core dependencies that work
     print("Installing core dependencies...")
     deps = [
-        "grpcio>=1.50",
-        "protobuf>=4.0,<5.0",
-        "pydantic>=1.9,<2.0",
-        "pydantic[dotenv]>=1.9,<2.0",
-        "numpy>=1.22",
-        "pytest>=7.0",
-        "pytest-mock>=3.7",
-        "pytest-asyncio>=0.18",
+        '"grpcio>=1.50"',
+        '"protobuf>=4.0,<5.0"',
+        '"pydantic>=1.9,<2.0"',
+        '"pydantic[dotenv]>=1.9,<2.0"',
+        '"python-dateutil>=2.8"',
+        '"deprecation>=2.1"',
+        '"numpy>=1.22"',
+        '"pytest>=7.0"',
+        '"pytest-mock>=3.7"',
+        '"pytest-asyncio>=0.18"',
     ]
 
     for dep in deps:
