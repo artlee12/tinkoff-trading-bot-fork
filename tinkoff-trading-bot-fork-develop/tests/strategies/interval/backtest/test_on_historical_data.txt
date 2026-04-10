@@ -1,0 +1,4 @@
+Positions in portfolio: 0 (0.0 lots)
+It's average price:     0.0
+Balance left:           -8.212899999999962
+Orders made:            14
