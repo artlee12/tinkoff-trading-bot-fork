@@ -101,7 +101,7 @@ class CandleHandler:
         # При смене этого значения данные будут загружены из кэша без API
         self.now = datetime(2025, 10, 18, 23, 59, 59, tzinfo=timezone.utc)
         # Начало периода: сколько дней назад от now (меняйте это значение)
-        self.from_date = self.now - timedelta(days=15)
+        self.from_date = self.now - timedelta(days=300)
         self.candles = []
         self.config = config
 
@@ -148,29 +148,45 @@ class CandleHandler:
                     )
                     self.candles.append(candle)
 
-            # Фильтруем по датам
-            self.candles = [
-                c for c in self.candles
-                if self.from_date <= c.time <= self.now
-            ]
-            self.candles.sort(key=lambda x: x.time)
+            # Определяем диапазон дат в CSV
+            if self.candles:
+                first_candle_time = min(c.time for c in self.candles)
+                last_candle_time = max(c.time for c in self.candles)
+
+                # Если from_date раньше первой свечи, сдвигаем к началу данных
+                if self.from_date < first_candle_time:
+                    self.from_date = first_candle_time
+
+                # Фильтруем по доступным данным
+                self.candles = [
+                    c for c in self.candles
+                    if self.from_date <= c.time <= last_candle_time
+                ]
+                self.candles.sort(key=lambda x: x.time)
+
+        # Итерируемся по свечам в окнах по days_back_to_consider
+        window_end = self.from_date + timedelta(days=self.config.days_back_to_consider)
 
         any_returned = False
         for candle in self.candles:
-            if self.from_date < candle.time:
-                if candle.time < self.from_date + timedelta(days=self.config.days_back_to_consider):
-                    any_returned = True
-                    yield candle
-                else:
-                    break
+            if self.from_date <= candle.time <= window_end:
+                any_returned = True
+                yield candle
 
         if not any_returned:
+            # Если в текущем окне нет данных, сдвигаем окно и пробуем снова
+            # Но ограничиваем количество сдвигов, чтобы не зациклиться
+            self.from_date += timedelta(seconds=self.config.check_interval)
             raise NoMoreDataError()
+
+        # Сдвигаем окно на check_interval секунд для следующей итерации
         self.from_date += timedelta(seconds=self.config.check_interval)
 
     async def get_last_prices(self, figi: List[str]) -> GetLastPricesResponse:
-        for candle in self.candles:
-            if candle.time >= self.from_date + timedelta(days=self.config.days_back_to_consider):
+        # Возвращаем последнюю цену в текущем окне
+        window_end = self.from_date + timedelta(days=self.config.days_back_to_consider)
+        for candle in reversed(self.candles):
+            if self.from_date <= candle.time <= window_end:
                 return GetLastPricesResponse(
                     last_prices=[
                         LastPrice(figi=figi[0], price=candle.close, time=candle.time)]
