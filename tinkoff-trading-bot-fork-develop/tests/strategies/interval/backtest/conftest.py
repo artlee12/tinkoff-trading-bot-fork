@@ -90,36 +90,70 @@ def test_config(lot: int) -> IntervalStrategyConfig:
 
 @pytest.fixture
 def client() -> Services:
-    with Client(settings.token) as client:
-        yield client
+    # Фикстура не использует реальный API - данные берутся из CSV
+    return None
 
 
 class CandleHandler:
     def __init__(self, config: IntervalStrategyConfig):
         from datetime import timezone
-        # Дата конца периода: 18 октября 2025
+        # Дата конца периода - настраивается под ваши данные
+        # При смене этого значения данные будут загружены из кэша без API
         self.now = datetime(2025, 10, 18, 23, 59, 59, tzinfo=timezone.utc)
-        # Начало периода: 15 дней назад
+        # Начало периода: сколько дней назад от now (меняйте это значение)
         self.from_date = self.now - timedelta(days=15)
         self.candles = []
         self.config = config
 
     async def get_all_candles(self, **kwargs):
         if not self.candles:
-            with Client(settings.token) as client:
-                market_data_cache = MarketDataCache(
-                    settings=MarketDataCacheSettings(
-                        base_cache_dir=Path("market_data_cache")),
-                    services=client,
-                )
-                self.candles = list(
-                    market_data_cache.get_all_candles(
-                        figi=kwargs["figi"],
-                        to=self.now,
-                        from_=self.from_date,
-                        interval=kwargs["interval"],
+            # Загрузка из CSV файла напрямую - не требует API токена
+            import csv
+            import ast
+
+            figi = kwargs["figi"]
+            cache_dir = Path("market_data_cache") / figi
+
+            # Ищем CSV файлы в кэше
+            csv_files = list(cache_dir.glob("*.csv"))
+            if not csv_files:
+                raise FileNotFoundError(f"No CSV files found in {cache_dir}")
+
+            # Читаем первый найденный CSV
+            csv_file = csv_files[0]
+            self.candles = []
+
+            with open(csv_file, 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    # Парсим дату
+                    candle_time = datetime.fromisoformat(row['time'])
+
+                    # Парсим цены из строкового представления словарей
+                    close_dict = ast.literal_eval(row['close'])
+                    close_units = int(close_dict['units'])
+                    close_nano = int(close_dict['nano'])
+
+                    # Создаем объект свечи (минимальный набор полей)
+                    from tinkoff.invest import HistoricCandle, Quotation
+                    candle = HistoricCandle(
+                        open=Quotation(units=0, nano=0),
+                        high=Quotation(units=0, nano=0),
+                        low=Quotation(units=0, nano=0),
+                        close=Quotation(units=close_units, nano=close_nano),
+                        volume=int(row['volume']),
+                        time=candle_time,
+                        is_complete=row['is_complete'] == 'True',
+                        candle_source_type=int(row.get('candle_source_type', 0))
                     )
-                )
+                    self.candles.append(candle)
+
+            # Фильтруем по датам
+            self.candles = [
+                c for c in self.candles
+                if self.from_date <= c.time <= self.now
+            ]
+            self.candles.sort(key=lambda x: x.time)
 
         any_returned = False
         for candle in self.candles:
